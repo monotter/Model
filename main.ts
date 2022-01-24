@@ -1,4 +1,4 @@
-import { MongoClient, ConnectOptions, Database, Collection, InsertDocument, Filter, InsertOptions, FindOptions, UpdateFilter, UpdateOptions, DeleteOptions, CountOptions } from "https://deno.land/x/mongo@v0.29.1/mod.ts"
+import { MongoClient, ConnectOptions, Database, Collection, InsertDocument, Filter, InsertOptions, FindOptions, UpdateFilter, UpdateOptions, DeleteOptions, CountOptions } from "./depts.ts"
 function wait(time: number) { return new Promise((res) => setTimeout(res, time)) }
 
 

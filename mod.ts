@@ -86,20 +86,20 @@ export default class Model <T> {
         }
     }
 
-    public async update(filter: MONGO.Filter<T>, document: MONGO.UpdateFilter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
-    public async update(filter: MONGO.Filter<T>, document: MONGO.UpdateFilter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
-    public async update(filter: MONGO.Filter<T>, document: MONGO.UpdateFilter<T>, options?: MONGO.FindOptions & { multiple?: boolean }) {
+    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
+    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
+    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: boolean }) {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         if (_options.multiple || _options?.multiple === undefined) {
             const updated = (await this.select(filter, { multiple: true, projection: { _id: true } })).map(({ _id }) => _id)
             delete _options?.multiple
-            await Model.updateMany({ _id: updated }, document)
+            await Model.updateMany({ _id: updated }, <MONGO.UpdateFilter<T>>{ $set: document })
             return updated
         } else {
             const updated = (await this.select(filter, { multiple: false, projection: { _id: true } }))?._id
             delete _options?.multiple
-            updated && await Model.updateOne({ _id: updated }, document)
+            updated && await Model.updateOne({ _id: updated }, <MONGO.UpdateFilter<T>>{ $set: document })
             return updated
         }
     }

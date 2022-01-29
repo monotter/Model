@@ -19,7 +19,7 @@ const model = new DBModel<{
 const result1 = await model.insert([{ name: 'iyy', number: 31 },{ name: 'iyy', number: 31 },{ name: 'iyy', number: 31 },{ name: 'iyy', number: 31 },{ name: 'iyy', number: 31 }])
 console.log(5, result1)
 
-const result2 = await model.update({ name: 'iyy' }, { $set: { name: 'aww' } })
+const result2 = await model.update({ name: 'iyy' }, { name: 'aww' })
 console.log(6, result2)
 
 const result3 = await model.select({ name: 'aww' })

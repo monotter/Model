@@ -72,18 +72,68 @@ export default class Model <T> {
         }
     }
 
-    public async select(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<(T & { _id: MONGO.Bson.ObjectId })[]>
-    public async select(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<T & { _id: MONGO.Bson.ObjectId } | undefined>
-    public async select(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<T | undefined | T[]> {
+    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(T & { _id: MONGO.Bson.ObjectId })[]>
+    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<T & { _id: MONGO.Bson.ObjectId } | undefined>
+    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<T | undefined | T[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
-        if (_options.multiple || _options?.multiple === undefined) {
-            delete _options?.multiple
-            return await Model.find(filter, _options).toArray()
-        } else {
-            delete _options?.multiple
-            return await Model.findOne(filter, _options)
+        const populate = _options.populate
+        if (populate) {
+            delete _options.populate
         }
+        let document: T | T[] | undefined
+        if (_options.multiple || _options?.multiple === undefined) {
+            delete _options.multiple
+            document = await Model.find(filter, _options).toArray()
+        } else {
+            delete _options.multiple
+            document = await Model.findOne(filter, _options)
+        }
+        const promises: Promise<void>[] = []
+        if (document && populate) {
+            Object.keys(populate).forEach((collection) => {
+                const documents = Array.isArray(document) ? document : [document]
+                documents.forEach((doc) => {
+                    const paths = Array.isArray(populate[collection]) ? populate[collection] : [populate[collection]]
+                        ;(<any>paths).forEach((path: string) => {
+                        const [pointer, pointers] = ((a,b) => {
+                            let planes: any = [ a ]
+                            const vals = b.split('.')
+                            const pointer: any = vals.pop()
+                            while (vals.length > 0) {
+                                if (Array.isArray(planes[0]) && isNaN(parseInt(vals[0]))) {
+                                    planes = planes.flat()
+                                }
+                                planes = planes.map((a: any) => a[vals[0]])
+                                vals.shift()
+                            }
+                            if (Array.isArray(planes[0]) && isNaN(parseInt(pointer))) {
+                                planes = planes.flat()
+                            }
+                            return [pointer, planes]
+                        })(doc, path)
+                        pointers.forEach((_p: any) => {
+                            if (Array.isArray(_p[pointer])) {
+                                const promise = Promise.all(_p[pointer].map((_id: MONGO.Bson.ObjectId) => new Promise((res) => {
+                                    res(this.db!.collection(collection).findOne({ _id }))
+                                }))).then((data) => _p[pointer] = data)
+                                promises.push(<any>promise)
+                            } else {
+                                promises.push(
+                                    new Promise((res) => {
+                                        res(this.db!.collection(collection).findOne({ _id: _p[pointer] }))
+                                    }).then(() => {
+                                        _p[pointer] = _p
+                                    })
+                                )
+                            }
+                        })
+                    })
+                })
+            })
+        }
+        await Promise.all(promises)
+        return document
     }
 
     public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
@@ -94,7 +144,7 @@ export default class Model <T> {
         if (_options.multiple || _options?.multiple === undefined) {
             const updated = (await this.select(filter, { multiple: true, projection: { _id: true } })).map(({ _id }) => _id)
             delete _options?.multiple
-            await Model.updateMany({ _id: updated }, <MONGO.UpdateFilter<T>>{ $set: document })
+            await Model.updateMany({ $or: updated.map((a => ({_id: a}))) }, <MONGO.UpdateFilter<T>>{ $set: document })
             return updated
         } else {
             const updated = (await this.select(filter, { multiple: false, projection: { _id: true } }))?._id
@@ -104,14 +154,14 @@ export default class Model <T> {
         }
     }
 
-    public async delete(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
-    public async delete(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
-    public async delete(filter: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<MONGO.Bson.ObjectId | unknown | MONGO.Bson.ObjectId[]> {
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<MONGO.Bson.ObjectId | unknown | MONGO.Bson.ObjectId[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         if (_options.multiple || _options?.multiple === undefined) {
             const deleted = (await this.select(filter, { multiple: true, projection: { _id: true } })).map(({ _id }) => _id)
-            await Model.deleteMany({ _id: deleted }, options)
+            await Model.deleteMany({ $or: deleted.map((a => ({_id: a}))) }, options)
             return deleted
         } else {
             const deleted = (await this.select(filter, { multiple: false, projection: { _id: true } }))?._id

@@ -5,11 +5,11 @@ function wait(time: number) { return new Promise((res) => setTimeout(res, time))
 export type ObjectId = MONGO.Bson.ObjectId
 export type InsertId<Type> = Type & { _id: ObjectId }
 
-export default class Model <T> {
+export default class Model <Schema> {
     public client: MONGO.MongoClient
     public db?: MONGO.Database
     public collectionName: string
-    private Model?: MONGO.Collection<T>
+    private Model?: MONGO.Collection<Schema>
     constructor(collectionName: string, conn: string)
     constructor(collectionName: string, conn: MONGO.MongoClient)
     constructor(collectionName: string, conn: { client: MONGO.MongoClient })
@@ -52,7 +52,7 @@ export default class Model <T> {
         }
     }
 
-    public async getModel(): Promise<MONGO.Collection<T>> {
+    public async getModel(): Promise<MONGO.Collection<Schema>> {
         while (!this.Model) { await wait(100) }
         return this.Model
     }
@@ -63,9 +63,9 @@ export default class Model <T> {
         this.Model = this.db.collection(this.collectionName)
     }
 
-    public async insert(document: MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId>
-    public async insert(document: MONGO.InsertDocument<T>[], InsertOptions?: MONGO.InsertOptions): Promise<ObjectId[]>
-    public async insert(document: MONGO.InsertDocument<T>[] | MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId | Required<MONGO.InsertDocument<T>>["_id"] | (ObjectId | Required<MONGO.InsertDocument<T>>["_id"])[]>  {
+    public async insert(document: MONGO.InsertDocument<Schema>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId>
+    public async insert(document: MONGO.InsertDocument<Schema>[], InsertOptions?: MONGO.InsertOptions): Promise<ObjectId[]>
+    public async insert(document: MONGO.InsertDocument<Schema>[] | MONGO.InsertDocument<Schema>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId | Required<MONGO.InsertDocument<Schema>>["_id"] | (ObjectId | Required<MONGO.InsertDocument<Schema>>["_id"])[]>  {
         const Model = await this.getModel()
         if (Array.isArray(document)) {
             return (await Model.insertMany(document, InsertOptions)).insertedIds
@@ -74,16 +74,16 @@ export default class Model <T> {
         }
     }
 
-    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(T & { _id: ObjectId } & (Populate & { _id: ObjectId }))[]>
-    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<T & { _id: ObjectId } & (Populate & { _id: ObjectId }) | undefined>
-    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<T & (Populate  & { _id: ObjectId }) | undefined | (T & (Populate & { _id: ObjectId }))[]> {
+    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(Schema & { _id: ObjectId } & (Populate & { _id: ObjectId }))[]>
+    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<Schema & { _id: ObjectId } & (Populate & { _id: ObjectId }) | undefined>
+    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<Schema & (Populate  & { _id: ObjectId }) | undefined | (Schema & (Populate & { _id: ObjectId }))[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         const populate = _options.populate
         if (populate) {
             delete _options.populate
         }
-        let document: T | T[] | undefined
+        let document: Schema | Schema[] | undefined
         if (_options.multiple || _options?.multiple === undefined) {
             delete _options.multiple
             document = await Model.find(filter, _options).toArray()
@@ -135,30 +135,30 @@ export default class Model <T> {
             })
         }
         await Promise.all(promises)
-        return <T & (Populate  & { _id: ObjectId }) | undefined | (T & (Populate & { _id: ObjectId }))[]>document
+        return <Schema & (Populate  & { _id: ObjectId }) | undefined | (Schema & (Populate & { _id: ObjectId }))[]>document
     }
 
-    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
-    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
-    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: boolean }) {
+    public async update(filter: MONGO.Filter<Schema>, document: Partial<Schema> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
+    public async update(filter: MONGO.Filter<Schema>, document: Partial<Schema> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
+    public async update(filter: MONGO.Filter<Schema>, document: Partial<Schema> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: boolean }) {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         if (_options.multiple || _options?.multiple === undefined) {
             const updated = (await this.select(filter, { multiple: true, projection: { _id: true } })).map(({ _id }) => _id)
             delete _options?.multiple
-            await Model.updateMany({ $or: updated.map((a => ({_id: a}))) }, <MONGO.UpdateFilter<T>>{ $set: document })
+            await Model.updateMany({ $or: updated.map((a => ({_id: a}))) }, <MONGO.UpdateFilter<Schema>>{ $set: document })
             return updated
         } else {
             const updated = (await this.select(filter, { multiple: false, projection: { _id: true } }))?._id
             delete _options?.multiple
-            updated && await Model.updateOne({ _id: updated }, <MONGO.UpdateFilter<T>>{ $set: document })
+            updated && await Model.updateOne({ _id: updated }, <MONGO.UpdateFilter<Schema>>{ $set: document })
             return updated
         }
     }
 
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<ObjectId | unknown | ObjectId[]> {
+    public async delete(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
+    public async delete(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
+    public async delete(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<ObjectId | unknown | ObjectId[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         if (_options.multiple || _options?.multiple === undefined) {
@@ -171,7 +171,7 @@ export default class Model <T> {
             return deleted
         }
     }
-    public async count(filter: MONGO.Filter<T>, options?: MONGO.CountOptions) {
+    public async count(filter: MONGO.Filter<Schema>, options?: MONGO.CountOptions) {
         const Model = await this.getModel()
         return await Model.countDocuments(filter, options)
     }

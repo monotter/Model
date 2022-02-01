@@ -3,6 +3,8 @@ const { MongoClient } = MONGO
 function wait(time: number) { return new Promise((res) => setTimeout(res, time)) }
 
 export type ObjectId = MONGO.Bson.ObjectId
+export type InsertId<Type> = Type & { _id: ObjectId }
+
 export default class Model <T> {
     public client: MONGO.MongoClient
     public db?: MONGO.Database
@@ -61,9 +63,9 @@ export default class Model <T> {
         this.Model = this.db.collection(this.collectionName)
     }
 
-    public async insert(document: MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<MONGO.Bson.ObjectId>
-    public async insert(document: MONGO.InsertDocument<T>[], InsertOptions?: MONGO.InsertOptions): Promise<MONGO.Bson.ObjectId[]>
-    public async insert(document: MONGO.InsertDocument<T>[] | MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<MONGO.Bson.ObjectId | Required<MONGO.InsertDocument<T>>["_id"] | (MONGO.Bson.ObjectId | Required<MONGO.InsertDocument<T>>["_id"])[]>  {
+    public async insert(document: MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId>
+    public async insert(document: MONGO.InsertDocument<T>[], InsertOptions?: MONGO.InsertOptions): Promise<ObjectId[]>
+    public async insert(document: MONGO.InsertDocument<T>[] | MONGO.InsertDocument<T>, InsertOptions?: MONGO.InsertOptions): Promise<ObjectId | Required<MONGO.InsertDocument<T>>["_id"] | (ObjectId | Required<MONGO.InsertDocument<T>>["_id"])[]>  {
         const Model = await this.getModel()
         if (Array.isArray(document)) {
             return (await Model.insertMany(document, InsertOptions)).insertedIds
@@ -72,9 +74,9 @@ export default class Model <T> {
         }
     }
 
-    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(T & { _id: MONGO.Bson.ObjectId })[]>
-    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<T & { _id: MONGO.Bson.ObjectId } | undefined>
-    public async select(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<T | undefined | T[]> {
+    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(T & { _id: ObjectId } & (Populate & { _id: ObjectId }))[]>
+    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<T & { _id: ObjectId } & (Populate & { _id: ObjectId }) | undefined>
+    public async select<Populate>(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<T & (Populate  & { _id: ObjectId }) | undefined | (T & (Populate & { _id: ObjectId }))[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         const populate = _options.populate
@@ -114,7 +116,7 @@ export default class Model <T> {
                         })(doc, path)
                         pointers.forEach((_p: any) => {
                             if (Array.isArray(_p[pointer])) {
-                                const promise = Promise.all(_p[pointer].map((_id: MONGO.Bson.ObjectId) => new Promise((res) => {
+                                const promise = Promise.all(_p[pointer].map((_id: ObjectId) => new Promise((res) => {
                                     res(this.db!.collection(collection).findOne({ _id }))
                                 }))).then((data) => _p[pointer] = data)
                                 promises.push(<any>promise)
@@ -133,11 +135,11 @@ export default class Model <T> {
             })
         }
         await Promise.all(promises)
-        return document
+        return <T & (Populate  & { _id: ObjectId }) | undefined | (T & (Populate & { _id: ObjectId }))[]>document
     }
 
-    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
-    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
+    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
+    public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
     public async update(filter: MONGO.Filter<T>, document: Partial<T> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: boolean }) {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
@@ -154,9 +156,9 @@ export default class Model <T> {
         }
     }
 
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<MONGO.Bson.ObjectId[]>
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<MONGO.Bson.ObjectId | unknown>
-    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<MONGO.Bson.ObjectId | unknown | MONGO.Bson.ObjectId[]> {
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: false }): Promise<ObjectId | unknown>
+    public async delete(filter?: MONGO.Filter<T>, options?: MONGO.FindOptions & { multiple?: boolean }): Promise<ObjectId | unknown | ObjectId[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         if (_options.multiple || _options?.multiple === undefined) {

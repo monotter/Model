@@ -5,7 +5,7 @@ function wait(time: number) { return new Promise((res) => setTimeout(res, time))
 export type ObjectId = MONGO.Bson.ObjectId
 export type InsertId<Type> = Type & { _id: ObjectId }
 
-export default class Model <Schema> {
+export default class Model <Schema, PopulateSchema> {
     public client: MONGO.MongoClient
     public db?: MONGO.Database
     public collectionName: string
@@ -74,9 +74,9 @@ export default class Model <Schema> {
         }
     }
 
-    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(Schema & { _id: ObjectId } & (Populate & { _id: ObjectId }))[]>
-    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<Schema & { _id: ObjectId } & (Populate & { _id: ObjectId }) | undefined>
-    public async select<Populate>(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<Schema & (Populate  & { _id: ObjectId }) | undefined | (Schema & (Populate & { _id: ObjectId }))[]> {
+    public async select(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: true, populate?: { [collection: string]: string | string[] } }): Promise<(Schema & { _id: ObjectId } & (PopulateSchema & { _id: ObjectId }))[]>
+    public async select(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: false, populate?: { [collection: string]: string | string[] } }): Promise<Schema & { _id: ObjectId } & (PopulateSchema & { _id: ObjectId }) | undefined>
+    public async select(filter?: MONGO.Filter<Schema>, options?: MONGO.FindOptions & { multiple?: boolean, populate?: { [collection: string]: string | string[] } }): Promise<Schema & (PopulateSchema  & { _id: ObjectId }) | undefined | (Schema & (PopulateSchema & { _id: ObjectId }))[]> {
         const Model = await this.getModel()
         const _options = Object.assign({}, options)
         const populate = _options.populate
@@ -135,7 +135,7 @@ export default class Model <Schema> {
             })
         }
         await Promise.all(promises)
-        return <Schema & (Populate  & { _id: ObjectId }) | undefined | (Schema & (Populate & { _id: ObjectId }))[]>document
+        return <Schema & (PopulateSchema  & { _id: ObjectId }) | undefined | (Schema & (PopulateSchema & { _id: ObjectId }))[]>document
     }
 
     public async update(filter: MONGO.Filter<Schema>, document: Partial<Schema> & MONGO.Bson.Document, options?: MONGO.FindOptions & { multiple?: true }): Promise<ObjectId[]>
